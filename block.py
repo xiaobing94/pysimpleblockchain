@@ -1,5 +1,6 @@
 # coding:utf-8
-
+from errors import NonceNotFoundError
+from pow import ProofOfWork
 from block_header import BlockHeader
 
 class Block(object):
@@ -14,11 +15,21 @@ class Block(object):
         self._magic_no = self.MAGIC_NO
         self._block_header = block_header
         self._transactions = transactions
+        pow = ProofOfWork(self)
+        try:
+            nonce, _ = pow.run()
+        except NonceNotFoundError as e:
+            print(e)
+        self._block_header.nonce = nonce
     
     @classmethod
     def new_genesis_block(cls, coin_base_tx):
         block_header = BlockHeader.new_genesis_block_header()
         return cls(block_header, coin_base_tx)
+
+    @property
+    def block_header(self):
+        return self._block_header
         
     def set_header_hash(self):
         self._block_header.set_hash()
