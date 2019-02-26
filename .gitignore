@@ -1,0 +1,7 @@
+/.idea/
+/.gradle/
+/.vscode/
+/build/
+/out/
+*.iml
+*.pyc
