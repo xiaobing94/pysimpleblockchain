@@ -40,6 +40,23 @@ class BlockHeader(object):
         data = ''.join(data_list)
         self.hash = sum256_hex(data)
 
+    def serialize(self):
+        return self.__dict__
+    
+    @classmethod
+    def deserialize(cls, data):
+        timestamp = data.get('timestamp', '')
+        prev_block_hash = data.get('pre_block_hash', '')
+        hash = data.get('hash', '')
+        hash_merkle_root = data.get('hash_merkle_root', '')
+        height = data.get('height', '')
+        nonce = data.get('nonce', '')
+        block_header = cls(hash_merkle_root, height, prev_block_hash)
+        block_header.timestamp = timestamp
+        block_header.nonce = nonce
+        block_header.hash = hash
+        return block_header
+
     def __repr__(self):
         return 'BlockHeader(timestamp={0!r}, hash_merkle_root={1!r}, prev_block_hash={2!r}, hash={3!r}, nonce={4!r}, height={5!r})'.format(
             self.timestamp, self.hash_merkle_root, self.prev_block_hash, self.hash, self.nonce, self.height)

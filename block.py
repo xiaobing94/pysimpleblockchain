@@ -15,6 +15,8 @@ class Block(object):
         self._magic_no = self.MAGIC_NO
         self._block_header = block_header
         self._transactions = transactions
+
+    def mine(self):
         pow = ProofOfWork(self)
         try:
             nonce, _ = pow.run()
@@ -36,6 +38,20 @@ class Block(object):
     
     def get_header_hash(self):
         return self._block_header.hash
+
+    def serialize(self):
+        return {
+            "magic_no": self._magic_no,
+            "block_header": self._block_header.serialize(),
+            "transactions": self._transactions
+        }
+    
+    @classmethod
+    def deserialize(cls, data):
+        block_header_dict = data['block_header']
+        block_header = BlockHeader.deserialize(block_header_dict)
+        transactions = data["transactions"]
+        return cls(block_header, transactions)
 
     def __repr__(self):
         return 'Block(_block_header=%s)' % self._block_header
