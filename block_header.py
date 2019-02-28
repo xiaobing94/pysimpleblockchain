@@ -46,7 +46,7 @@ class BlockHeader(object):
     @classmethod
     def deserialize(cls, data):
         timestamp = data.get('timestamp', '')
-        prev_block_hash = data.get('prev_block_hash', '')
+        prev_block_hash = data.get('pre_block_hash', '')
         hash = data.get('hash', '')
         hash_merkle_root = data.get('hash_merkle_root', '')
         height = data.get('height', '')

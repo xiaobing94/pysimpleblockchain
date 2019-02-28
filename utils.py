@@ -26,6 +26,7 @@ def sum256_byte(*args):
             m.update(arg)
     return m.digest()
 
+
 class Singleton(object):
     _instance_lock = threading.Lock()
     __instance = None

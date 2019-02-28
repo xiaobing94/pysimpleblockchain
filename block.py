@@ -2,6 +2,7 @@
 from errors import NonceNotFoundError
 from pow import ProofOfWork
 from block_header import BlockHeader
+from transactions import Transaction
 
 class Block(object):
     """A Block
@@ -32,6 +33,10 @@ class Block(object):
     @property
     def block_header(self):
         return self._block_header
+    
+    @property
+    def transactions(self):
+        return self._transactions
         
     def set_header_hash(self):
         self._block_header.set_hash()
@@ -43,7 +48,7 @@ class Block(object):
         return {
             "magic_no": self._magic_no,
             "block_header": self._block_header.serialize(),
-            "transactions": self._transactions
+            "transactions": [tx.serialize() for tx in self._transactions]
         }
     
     @classmethod
@@ -51,7 +56,10 @@ class Block(object):
         block_header_dict = data['block_header']
         block_header = BlockHeader.deserialize(block_header_dict)
         transactions = data["transactions"]
-        return cls(block_header, transactions)
+        txs = []
+        for transaction in transactions:
+            txs.append(Transaction.deserialize(transaction))
+        return cls(block_header, txs)
 
     def __repr__(self):
         return 'Block(_block_header=%s)' % self._block_header

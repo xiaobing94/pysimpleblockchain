@@ -2,3 +2,6 @@
 
 class NonceNotFoundError(Exception):
     pass
+
+class NotEnoughAmountError(Exception):
+    pass
