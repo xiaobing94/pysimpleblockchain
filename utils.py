@@ -36,7 +36,6 @@ def hash_public_key(pubkey):
 def address_to_pubkey_hash(address):
     return base58.b58decode_check(address)[1:]
 
-
 class Singleton(object):
     _instance_lock = threading.Lock()
     __instance = None

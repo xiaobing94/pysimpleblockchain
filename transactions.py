@@ -68,8 +68,8 @@ class Transaction(object):
         self.vouts = vouts
 
     def set_id(self):
-        data_list = [str(vin) for vin in self.vins]
-        vouts_list = [str(vout) for vout in self.vouts]
+        data_list = [str(vin.serialize()) for vin in self.vins]
+        vouts_list = [str(vout.serialize()) for vout in self.vouts]
         data_list.extend(vouts_list)
         data = ''.join(data_list)
         hash = sum256_hex(data)
@@ -105,7 +105,7 @@ class Transaction(object):
     def coinbase_tx(cls, to, data):
         if not data:
             data = "Reward to '%s'" % to
-        txin = TXInput('', -1, '')
+        txin = TXInput('', -1, data)
         txout = TXOutput(subsidy, to)
         tx = cls([txin], [txout])
         tx.set_id()
@@ -148,8 +148,9 @@ class Transaction(object):
             self.vins[in_id].signature = binascii.hexlify(sign).decode()
     
     def verify(self, prev_txs):
+        if self.is_coinbase():
+            return True
         tx_copy = self._trimmed_copy()
-
         for in_id, vin in enumerate(self.vins):
             prev_tx = prev_txs.get(vin.txid, None)
             if not prev_tx:

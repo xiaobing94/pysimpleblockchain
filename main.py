@@ -3,7 +3,7 @@
 from block import Block
 from block_chain import BlockChain
 from block_header import BlockHeader
-
+from utxo import UTXOSet
 from wallet import Wallet
 from wallets import Wallets
 
@@ -27,6 +27,13 @@ def main():
 
     for block in bc:
         print(block)
+
+# def main():
+#     bc = BlockChain()
+#     uxtoset = UXTOSet()
+#     uxtoset.reindex(bc)
+#     uxtos = uxtoset.find_utxo('LLPc8AmZvNSUMxYj3qaHAXzN4WFcYFSYMt')
+#     print len(uxtos), uxtos
 
 if __name__ == "__main__":
     main()

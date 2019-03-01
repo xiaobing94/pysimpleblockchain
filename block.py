@@ -1,8 +1,10 @@
 # coding:utf-8
-from errors import NonceNotFoundError, TransactionVerifyError
+import json
 from pow import ProofOfWork
 from block_header import BlockHeader
 from transactions import Transaction
+from merkle import MerkleTree
+from errors import NonceNotFoundError, TransactionVerifyError
 
 class Block(object):
     """A Block
@@ -16,6 +18,11 @@ class Block(object):
         self._magic_no = self.MAGIC_NO
         self._block_header = block_header
         self._transactions = transactions
+        data = []
+        for tx in self._transactions:
+            data.append(json.dumps(tx.serialize()))
+        merkle_tree = MerkleTree(data)
+        self.set_hash_merkle_root_hash(merkle_tree.root_hash)
 
     def mine(self, bc):
         pow = ProofOfWork(self)
@@ -43,6 +50,9 @@ class Block(object):
         
     def set_header_hash(self):
         self._block_header.set_hash()
+
+    def set_hash_merkle_root_hash(self, merkle_root_hash):
+        self.block_header.hash_merkle_root = merkle_root_hash
     
     def get_header_hash(self):
         return self._block_header.hash

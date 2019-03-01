@@ -1,4 +1,5 @@
 # coding:utf-8
+import time
 from block import Block
 from block_header import BlockHeader
 from db import DB
@@ -6,6 +7,7 @@ from transactions import TXInput, TXOutput, Transaction
 from errors import NotEnoughAmountError
 from utils import address_to_pubkey_hash
 from wallets import Wallets
+from utxo import UTXOSet
 
 class BlockChain(object):
     def __init__(self, db_url='http://127.0.0.1:5984'):
@@ -19,8 +21,13 @@ class BlockChain(object):
             self.db.create(genesis_block.block_header.hash, genesis_block.serialize())
             self.set_last_hash(genesis_block.block_header.hash)
 
+            utxo = UTXOSet()
+            utxo.update(genesis_block)
+
     def get_last_block(self):
         last_block_hash_doc = self.db.get('l')
+        if not last_block_hash_doc:
+            return None
         last_block_hash = last_block_hash_doc.get('hash', '')
         block_data = self.db.get(last_block_hash)
         block = Block.deserialize(block_data)
@@ -63,12 +70,22 @@ class BlockChain(object):
         prev_hash = last_block.get_header_hash()
         height = last_block.block_header.height + 1
         block_header = BlockHeader('', height, prev_hash)
+        
+        # reward to wallets[0]
+        wallets = Wallets()
+        keys = list(wallets.wallets.keys())
+        w = wallets[keys[0]]
+        coin_base_tx = self.coin_base_tx(w.address)
+        transactions.insert(0, coin_base_tx)
         block = Block(block_header, transactions)
         block.mine(self)
         block.set_header_hash()
         self.db.create(block.block_header.hash, block.serialize())
         last_hash = block.block_header.hash
         self.set_last_hash(last_hash)
+
+        utxo = UTXOSet()
+        utxo.update(block)
     
     def __getitem__(self, index):
         last_block = self.get_last_block()
@@ -82,11 +99,31 @@ class BlockChain(object):
         """
         Find all unspent transactions
         """
+        uxto_set = UTXOSet()
+        uxto_set.find_utxo(address)
+    
+    def _find_spendable_outputs(self, address, amount):
+        """
+        Find spendable outputs
+        """
+        uxto_set = UTXOSet()
+        accumulated, spentable_outs = uxto_set.find_spendable_outputs(address, amount)
+        return accumulated, spentable_outs
+
+    def find_UTXO(self):
+        """
+        Find all unspent transactions
+        """
         spent_txos = {}
         unspent_txs = {}
         
         last_block = self.get_last_block()
-        last_height = last_block.block_header.height
+        if last_block:
+            last_height = last_block.block_header.height
+        else:
+            last_height = -1
+        if last_height == -1:
+            return unspent_txs
         # Reverse
         for height in range(last_height, -1, -1):
             block = self.get_block_by_height(height)
@@ -95,57 +132,19 @@ class BlockChain(object):
                 # all outputs
                 for vout_index, vout in enumerate(tx.vouts):
                     txos = spent_txos.get(txid, [])
-                    # vout_index is spent
                     if vout_index in txos:
                         continue
-                    if vout.is_locked_with_key(address):
-                        old_vouts = unspent_txs.get(tx, [])
-                        old_vouts.append((vout_index, vout))
-                        unspent_txs[tx] = old_vouts
+                    old_vouts = unspent_txs.get(txid, [])
+                    old_vouts.append([vout_index, vout])
+                    unspent_txs[tx.txid] = old_vouts
                 if not tx.is_coinbase():
                     for vin in tx.vins:
                         vin_txid = vin.txid
-                        pubk_hash = address_to_pubkey_hash(address)
-                        if vin.use_key(pubk_hash):
-                            txid_vouts = spent_txos.get(vin_txid, [])
-                            if vin.vout not in txid_vouts:
-                                txid_vouts.append(vin.vout)
-                            spent_txos[vin_txid] = txid_vouts
+                        txid_vouts = spent_txos.get(vin_txid, [])
+                        if vin.vout not in txid_vouts:
+                            txid_vouts.append(vin.vout)
+                        spent_txos[vin_txid] = txid_vouts
         return unspent_txs
-    
-    def _find_spendable_outputs(self, address, amount):
-        """
-        Find spendable outputs
-        """
-        unspent_outputs = {}
-        accumulated = 0
-        found = False
-        unspent_txs = self._find_unspent_transactions(address)
-        for tx, index_vouts in unspent_txs.items():
-            txid = tx.txid
-            for index_vout in index_vouts:
-                vout = index_vout[1]
-                index = index_vout[0]
-                accumulated += vout.value
-                old_unspent_outpus = unspent_outputs.get(txid, [])
-                old_unspent_outpus.append((index, vout))
-                unspent_outputs[txid] = old_unspent_outpus
-                if accumulated >= amount and vout.is_locked_with_key(address):
-                    found = True
-                    break
-            if found:
-                break
-        return accumulated, unspent_outputs
-
-    def find_UTXO(self, address):
-        utxos = []
-        unspent_txs = self._find_unspent_transactions(address)
-        for _, index_vouts in unspent_txs.items():
-            for index_vout in index_vouts:
-                vout = index_vout[1]
-                if vout.is_locked_with_key(address):
-                    utxos.append(vout)
-        return utxos
 
     def new_transaction(self, from_addr, to_addr, amount):
         inputs = []
@@ -158,11 +157,11 @@ class BlockChain(object):
         acc, valid_outpus = self._find_spendable_outputs(from_addr, amount)
         if acc < amount:
             raise NotEnoughAmountError(u'not enough coin')
-        for txid, outs in valid_outpus.items():
-            for out in outs:
-                out_index = out[0]
-                input = TXInput(txid, out_index, pub_key)
-                inputs.append(input)
+        for fout in valid_outpus:
+            index = fout.index
+            txid = fout.txid
+            input = TXInput(txid, index, pub_key)
+            inputs.append(input)
         
         output = TXOutput(amount, to_addr)
         outputs.append(output)
@@ -176,7 +175,8 @@ class BlockChain(object):
         return tx
 
     def coin_base_tx(self, to_addr):
-        tx = Transaction.coinbase_tx(to_addr, '')
+        data = str(time.time())
+        tx = Transaction.coinbase_tx(to_addr, data)
         return tx
 
     def find_transaction(self, txid):

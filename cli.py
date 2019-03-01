@@ -3,7 +3,7 @@ import argparse
 from block_chain import BlockChain
 from wallet import Wallet
 from wallets import Wallets
-
+from utxo import UTXOSet
 
 def new_parser():
     parser = argparse.ArgumentParser()
@@ -41,9 +41,12 @@ def print_chain(bc):
 
 def get_balance(bc, addr):
     balance = 0
-    utxos = bc.find_UTXO(addr)
-    for utxo in utxos:
-        balance += utxo.value
+    utxo = UTXOSet()
+    utxo.reindex(bc)
+    utxos = utxo.find_utxo(addr)
+    print(utxos)
+    for fout in utxos:
+        balance += fout.txoutput.value
     print('%s balance is %d' %(addr, balance))
 
 def create_wallet():
@@ -51,7 +54,7 @@ def create_wallet():
     ws = Wallets()
     ws[w.address] = w
     ws.save()
-    print('Your new address is %s' % w.address)
+    print('Wallet address is %s' % w.address)
 
 def print_all_wallet():
     ws = Wallets()
@@ -68,6 +71,8 @@ def main():
     parser = new_parser()
     args = parser.parse_args()
     bc = BlockChain()
+    utxo_set = UTXOSet()
+    utxo_set.reindex(bc)
     if hasattr(args, 'print'):
         print_chain(bc)
 
