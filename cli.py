@@ -88,8 +88,7 @@ class Cli(object):
                 bc.add_block(tx_pool.txs)
                 tx_pool.clear()
         except Exception as e:
-            import traceback
-            msg = traceback.format_exc()
+            pass
         print('send %d from %s to %s' %(amount, from_addr, to_addr))
 
     def print_chain(self, height):
