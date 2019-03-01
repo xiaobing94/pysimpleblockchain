@@ -81,22 +81,15 @@ class Cli(object):
         # bc.add_block([tx])
         tx_pool = TxPool()
         tx_pool.add(tx)
-        from network import log
-        log.info("tx_pool:"+str(id(tx_pool)))
-        log.info("txs_len:"+str(len(tx_pool.txs)))
         try:
             server = PeerServer()
             server.broadcast_tx(tx)
-            log.info("tx_pool is full:"+str(tx_pool.is_full()))
-            log.info("tx_pool d :"+str(tx_pool))
             if tx_pool.is_full():
                 bc.add_block(tx_pool.txs)
-                log.info("add block")
                 tx_pool.clear()
         except Exception as e:
             import traceback
             msg = traceback.format_exc()
-            log.info("error_msg:"+msg)
         print('send %d from %s to %s' %(amount, from_addr, to_addr))
 
     def print_chain(self, height):

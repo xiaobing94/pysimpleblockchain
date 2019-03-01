@@ -1,4 +1,20 @@
-## part7网络
+## python实现简版比特币
+
+## 目录
+* [基本原型](#https://blog.csdn.net/xiaobing1994/article/details/87967291)
+* [工作量证明](#https://blog.csdn.net/xiaobing1994/article/details/87967693)
+* [持久化和命令行接口](#https://blog.csdn.net/xiaobing1994/article/details/88013596)
+* [交易（1）](#https://blog.csdn.net/xiaobing1994/article/details/88019680)
+* [地址](#https://blog.csdn.net/xiaobing1994/article/details/88060259)
+* [交易（2）](#https://blog.csdn.net/xiaobing1994/article/details/88060908)
+* [网络](#https://blog.csdn.net/xiaobing1994/article/details/88061046)
+
+## 依赖
+1. 安装python依赖
+`pip install -r requestments.txt`
+2. 安装couchdb(每个节点都要安装)
+	1. 直接安装，参考https://www.yiibai.com/couchdb/quick-start.html
+	2. docker版couchdb安装，使用docker-compose安装couchdb
 
 ## 使用方法
 分别打开两台主机A和B:
