@@ -1,13 +1,13 @@
 ## python实现简版比特币
 
 ## 目录
-* [基本原型](https://blog.csdn.net/xiaobing1994/article/details/87967291)
-* [工作量证明](https://blog.csdn.net/xiaobing1994/article/details/87967693)
-* [持久化和命令行接口](https://blog.csdn.net/xiaobing1994/article/details/88013596)
-* [交易（1）](https://blog.csdn.net/xiaobing1994/article/details/88019680)
-* [地址](https://blog.csdn.net/xiaobing1994/article/details/88060259)
-* [交易（2）](https://blog.csdn.net/xiaobing1994/article/details/88060908)
-* [网络](https://blog.csdn.net/xiaobing1994/article/details/88061046)
+* [基本原型](./docs/basic_type.md)
+* [工作量证明](./docs/pow.md)
+* [持久化和命令行接口](./docs/persistence-and-cli.md)
+* [交易（1）](./docs/transaction.md)
+* [地址](./docs/address.md)
+* [交易（2）](./docs/transactions-2.md)
+* [网络](./docs/network.md)
 
 ## 依赖
 1. 安装python依赖
