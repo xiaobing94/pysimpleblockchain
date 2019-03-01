@@ -151,6 +151,7 @@ class Transaction(object):
         if self.is_coinbase():
             return True
         tx_copy = self._trimmed_copy()
+
         for in_id, vin in enumerate(self.vins):
             prev_tx = prev_txs.get(vin.txid, None)
             if not prev_tx:

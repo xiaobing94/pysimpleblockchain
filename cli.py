@@ -1,9 +1,15 @@
 # coding:utf-8
 import argparse
+import threading
 from block_chain import BlockChain
 from wallet import Wallet
 from wallets import Wallets
 from utxo import UTXOSet
+from txpool import TxPool
+from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.client import ServerProxy
+from network import P2p, PeerServer, TCPServer
+from rpcserver import RPCServer
 
 def new_parser():
     parser = argparse.ArgumentParser()
@@ -11,10 +17,10 @@ def new_parser():
     # A print command
     print_parser = sub_parser.add_parser(
         'print', help='Print all the blocks of the blockchain')
-    print_parser.add_argument('--print', dest='print', action='store_true')
+    print_parser.add_argument(type=int, dest='height', help='HEIGHT')
     balance_parser = sub_parser.add_parser(
         'balance', help='Print balance of address')
-    balance_parser.add_argument(type=str, dest='address', help='address')
+    balance_parser.add_argument(type=str, dest='address', help='ADDRESS')
 
     send_parser = sub_parser.add_parser(
         'send', help='Send AMOUNT of coins from FROM address to TO')
@@ -27,68 +33,139 @@ def new_parser():
 
     bc_parser = sub_parser.add_parser(
         'createwallet', help='Create a wallet')
-    bc_parser.add_argument('--createwallet', dest='createwallet', help='createwallet')
+    bc_parser.add_argument('--createwallet', dest='createwallet', help='create wallet')
 
     prin_wallet_parser = sub_parser.add_parser(
         'printwallet', help='print all wallet')
-    prin_wallet_parser.add_argument('--print', dest='printwallet', help='print wallets')
+    prin_wallet_parser.add_argument('--printwallet', dest='printwallet', help='print wallets')
 
+    start_parser = sub_parser.add_parser(
+        'start', help='start server')
+    start_parser.add_argument('--start', dest='start', help='start server')
+
+    genesis_block_parser = sub_parser.add_parser(
+        'genesis_block', help='create genesis block')
+    genesis_block_parser.add_argument('--genesis_block', dest='genesis_block')
     return parser
 
-def print_chain(bc):
-    for block in bc:
-        print(block)
+class Cli(object):
+    def get_balance(self, addr):
+        bc = BlockChain()
+        balance = 0
+        utxo = UTXOSet()
+        utxo.reindex(bc)
+        utxos = utxo.find_utxo(addr)
+        print(utxos)
+        for fout in utxos:
+            balance += fout.txoutput.value
+        print('%s balance is %d' %(addr, balance))
+        return balance
 
-def get_balance(bc, addr):
-    balance = 0
-    utxo = UTXOSet()
-    utxo.reindex(bc)
-    utxos = utxo.find_utxo(addr)
-    print(utxos)
-    for fout in utxos:
-        balance += fout.txoutput.value
-    print('%s balance is %d' %(addr, balance))
+    def create_wallet(self):
+        w = Wallet.generate_wallet()
+        ws = Wallets()
+        ws[w.address] = w
+        ws.save()
+        return w.address
 
-def create_wallet():
-    w = Wallet.generate_wallet()
-    ws = Wallets()
-    ws[w.address] = w
-    ws.save()
-    print('Wallet address is %s' % w.address)
+    def print_all_wallet(self):
+        ws = Wallets()
+        wallets = []
+        for k, _ in ws.items():
+            wallets.append(k)
+        return wallets
 
-def print_all_wallet():
-    ws = Wallets()
-    print('Wallet are:')
-    for k, _ in ws.items():
-        print(k)
+    def send(self, from_addr, to_addr, amount):
+        bc = BlockChain()
+        tx = bc.new_transaction(from_addr, to_addr, amount)
+        # bc.add_block([tx])
+        tx_pool = TxPool()
+        tx_pool.add(tx)
+        from network import log
+        log.info("tx_pool:"+str(id(tx_pool)))
+        log.info("txs_len:"+str(len(tx_pool.txs)))
+        try:
+            server = PeerServer()
+            server.broadcast_tx(tx)
+            log.info("tx_pool is full:"+str(tx_pool.is_full()))
+            log.info("tx_pool d :"+str(tx_pool))
+            if tx_pool.is_full():
+                bc.add_block(tx_pool.txs)
+                log.info("add block")
+                tx_pool.clear()
+        except Exception as e:
+            import traceback
+            msg = traceback.format_exc()
+            log.info("error_msg:"+msg)
+        print('send %d from %s to %s' %(amount, from_addr, to_addr))
 
-def send(bc, from_addr, to_addr, amount):
-    tx = bc.new_transaction(from_addr, to_addr, amount)
-    bc.add_block([tx])
-    print('send %d from %s to %s' %(amount, from_addr, to_addr))
+    def print_chain(self, height):
+        bc = BlockChain()
+        return bc[height].block_header.serialize()
+
+    def create_genesis_block(self):
+        bc = BlockChain()
+        w = Wallet.generate_wallet()
+        ws = Wallets()
+        ws[w.address] = w
+        ws.save()
+        tx = bc.coin_base_tx(w.address)
+        bc.new_genesis_block(tx)
+        return w.address
+
+
+def start():
+    bc = BlockChain()
+    utxo_set = UTXOSet()
+    utxo_set.reindex(bc)
+
+    tcpserver = TCPServer()
+    tcpserver.listen()
+    tcpserver.run()
+
+    rpc = RPCServer(export_instance=Cli())
+    rpc.start(False)
+
+    p2p = P2p()
+    server = PeerServer()
+    server.run(p2p)
+    p2p.run()
 
 def main():
     parser = new_parser()
     args = parser.parse_args()
-    bc = BlockChain()
-    utxo_set = UTXOSet()
-    utxo_set.reindex(bc)
-    if hasattr(args, 'print'):
-        print_chain(bc)
+
+    s = ServerProxy("http://localhost:9999")
+    if hasattr(args, 'height'):
+        block_data = s.print_chain(args.height)
+        print(block_data)
 
     if hasattr(args, 'address'):
-        get_balance(bc, args.address)
+        balance = s.get_balance(args.address)
+        print("%s balance is %d" %(args.address, balance))
 
     if hasattr(args, 'createwallet'):
-        create_wallet()
+        address = s.create_wallet()
+        print('Wallet address is %s' % address)
+
+    if hasattr(args, 'start'):
+        start()
 
     if hasattr(args, 'printwallet'):
-        print_all_wallet()
+        wallets = s.print_all_wallet()
+        print('Wallet are:')
+        for wallet in wallets:
+            print("\t%s" % wallet)
+
+    if hasattr(args, 'genesis_block'):
+        address = s.create_genesis_block()
+        print('Genesis Wallet is: %s' % address)
+
 
     if hasattr(args, 'send_from') \
         and hasattr(args, 'send_to') \
         and hasattr(args, 'send_amount'):
-        send(bc, args.send_from, args.send_to, args.send_amount)
+        s.send(args.send_from, args.send_to, args.send_amount)
 
 if __name__ == "__main__":
     main()

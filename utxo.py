@@ -2,6 +2,7 @@
 from db import DB, Singleton
 from transactions import TXOutput
 from couchdb import ResourceNotFound, ResourceConflict
+from conf import db_url
 
 class FullTXOutput(object):
     def __init__(self, txid, txoutput, index):
@@ -11,10 +12,12 @@ class FullTXOutput(object):
 
 class UTXOSet(Singleton):
     FLAG = 'UTXO'
-    def __init__(self, db_url='http://127.0.0.1:5984'):
-        self.db = DB(db_url)
+    def __init__(self, db_url=db_url):
+        if not hasattr(self, 'db'):
+            self.db = DB(db_url)
 
     def update(self, block):
+
         for tx in block.transactions:
             txid = tx.txid
             key = self.FLAG + txid
@@ -39,6 +42,68 @@ class UTXOSet(Singleton):
                 except ResourceNotFound as e:
                     print(e)
         self.set_last_height(block.block_header.height)
+
+    def roll_back(self, block):
+        for tx in block.transactions:
+            txid = tx.txid
+            key = self.FLAG + txid
+            # remove utxo
+            for vout_index, vout in enumerate(tx.vouts):
+                tmp_key = key + "-" +str(vout_index)
+                doc = self.db.get(tmp_key)
+                if not doc:
+                    continue
+                try:
+                    self.db.delete(doc)
+                except ResourceNotFound as e:
+                    print(e)
+            # add utxo
+            for vin in tx.vins:
+                vin_txid = vin.txid
+                vout_index = vin.vout
+                key = self.FLAG + vin_txid + "-" +str(vin.vout)
+                query = {
+                    "selector": {
+                        "transactions": {
+                            "$elemMatch": {
+                                "txid": vin_txid
+                            }
+                        }
+                    }
+                }
+                docs = self.db.find(query)
+                if not docs:
+                    doc = docs[0]
+                else:
+                    continue
+                transactions = doc.get("transactions", [])
+                for tx in transactions:
+                    if tx.get("txid", "") == txid:
+                        vouts = tx.get("vouts", [])
+                        if len(vouts) <= vout_index:
+                            continue
+                        vout = vouts[vout_index]
+                        vout_dict = vout.serialize()
+                        vout_dict.update({"index": vout_index})
+                        tmp_key = key + "-" +str(vout_index)
+                        try:
+                            self.db.create(tmp_key, vout_dict)
+                        except ResourceConflict as e:
+                            print(e)
+        self.set_last_height(block.block_header.height-1)
+
+    def clear_transactions(self, transactions):
+        used_uxto = []
+        txs = []
+        for tx in transactions:
+            txid = tx.txid
+            for vin in tx.vins:
+                vin_txid = vin.txid
+                uxto = (vin_txid, vin.vout)
+                if uxto not in used_uxto:
+                    used_uxto.append(uxto)
+                    txs.append(tx)
+        return txs
 
     def get_last_height(self):
         key = self.FLAG + "l"
@@ -120,3 +185,11 @@ class UTXOSet(Singleton):
             ftxo = FullTXOutput(txid, TXOutput.deserialize(doc), index)
             utxos.append(ftxo)
         return utxos
+
+if __name__ == "__main__":
+    utxo = UTXOSet()
+    from block_chain import BlockChain
+    bc = BlockChain()
+    last_block = bc.get_last_block()
+    utxo.roll_back(last_block)
+    bc.roll_back()

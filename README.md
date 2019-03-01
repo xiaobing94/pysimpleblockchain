@@ -1,24 +1,47 @@
-## Part6 交易（2）
+## part7网络
 
 ## 使用方法
+分别打开两台主机A和B:
+A主机:
 ```bash
-# 创建创世块
-$python3 main.py
-<wallet.Wallet object at 0x0000010AED8276A0> <wallet.Wallet object at 0x0000010AED827940>
-19RUj6zvbrAXNnEtkuric5pYQJTkZy57nc 17AEyyKbeoEbfMa3jS8Uji6tVG37DrTJN9
-Mining a new block
-Found nonce == 53ash_hex == 0adfd71d90955ad9219871d8abe03ae83ef9f1f13f9a141ef6ca0ce2d16c93af
-('conflict', 'Document update conflict.')
-Block(_block_header=BlockHeader(timestamp='1551246051.6814992', hash_merkle_root='1f6cf2e68e8ab0dda1cc1550f85b4df85b83db3cc3af262b26a5a306121725be', prev_block_hash='', hash='ef20a87f2edc8589e813be60d534e736f51c45a3ec94e1918c18bce057afc89d', nonce=None, height=0))
-Block(_block_header=BlockHeader(timestamp='1551246052.0582814', hash_merkle_root='3cf2c8514fdaac0cb2b6502f72cf267bcf9966042be28ee48eff61e4695a90f2', prev_block_hash='ef20a87f2edc8589e813be60d534e736f51c45a3ec94e1918c18bce057afc89d', hash='b0bdedf26575722a7efdf94db7dfa60c1c4dfe1483529ff04dd553d6828de718', nonce=53, height=1))
-
-# 转账
-$python3 cli.py send --from 19RUj6zvbrAXNnEtkuric5pYQJTkZy57nc --to 17AEyyKbeoEbfMa3jS8Uji6tVG37DrTJN9 --amount 10
-Mining a new block
-Found nonce == 20ash_hex == 07e91245d4e66b66279224980b0325c37d2f2e54a75402bdcd8fe55346cb3dcb
-send 10 from 19RUj6zvbrAXNnEtkuric5pYQJTkZy57nc to 17AEyyKbeoEbfMa3jS8Uji6tVG37DrTJN9
-
-# 查询余额
-$python3 cli.py balance 19RUj6zvbrAXNnEtkuric5pYQJTkZy57nc
-19RUj6zvbrAXNnEtkuric5pYQJTkZy57nc balance is 1980
+$python3 cli.py start
 ```
+将B主机的conf.py中的bootstrap_host和bootstrap_port修改为A主机的ip和端口。然后启动B主机。
+```bash
+$python3 cli.py start
+```
+任意一台主机开启新的窗口执行生成创世块:
+```bash
+$python3 cli.py genesis_block
+Genesis Wallet is: 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r
+```
+分别在两台机器上查看余额:
+```bash
+$python3 cli.py balance 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r
+1LYHea8NjTxaYboXJbR7LemvUZjyQc839r balance is 1000
+```
+分别在两台机器上创建地址:
+```bash
+$python3 cli.py createwallet
+Wallet address is 14sQYjj3n2fReJyVNoqHCmCFjNKEZAVcEB
+```
+查看当前机器的所有地址
+```bash
+python3 cli.py printwallet
+Wallet are:
+	19zR4zT9eSFsbSNvnQ1RCrhjN71VzPFTnH
+	1MVUrxPuRgtkyLQvAoma4yEarzcMzvQqym
+	18kruspe7jAbggR1sUF8fCFsZLn6efSeFk
+	14sQYjj3n2fReJyVNoqHCmCFjNKEZAVcEB
+```
+转账(至少要转两笔才能确认哦，可以修改txpool.py的SIZE属性来调整区块大小)。注意：只有当前有这个地址（即有这个私钥）才能作为from转账给其他地址。
+```bash
+$python3 cli.py send --from 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r --to 19zR4zT9eSFsbSNvnQ1RCrhjN71VzPFTnH --amount 100
+$python3 cli.py send --from 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r --to 19zR4zT9eSFsbSNvnQ1RCrhjN71VzPFTnH --amount 100
+```
+分别在两台机器上查看余额:
+```bash
+python3 cli.py balance 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r
+1LYHea8NjTxaYboXJbR7LemvUZjyQc839r balance is 1900
+```
+注意：这里因为重复转了两笔账，使用了同一个UTXO，所以第二笔会失败，由于`1LYHea8NjTxaYboXJbR7LemvUZjyQc839r`为被奖励地址，所以获得了1000得挖矿奖励所以余额为:1000-100+900=1900。

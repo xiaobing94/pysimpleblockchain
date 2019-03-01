@@ -14,6 +14,9 @@ class MerkleNode(object):
 
 class MerkleTree(object):
     def __init__(self, datas):
+        # if len(datas)%2 != 0:
+        #     datas.append(datas[-1])
+        
         nodes = []
 
         for data_item in datas:

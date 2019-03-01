@@ -32,8 +32,10 @@ class ProofOfWork(object):
         while nonce < self.MAX_SIZE:
             data = self._prepare_data(nonce)
             hash_hex = utils.sum256_hex(data)
+
             hash_val = int(hash_hex, 16)
-            sys.stdout.write("try nonce == %d hash_hex == %s \r" % (nonce, hash_hex))
+            sys.stdout.write("data: %s\n" % data)
+            sys.stdout.write("try nonce == %d\thash_hex == %s \n" % (nonce, hash_hex))
             if (hash_val < self._target_bits):
                 found = True
                 break
@@ -51,7 +53,8 @@ class ProofOfWork(object):
         validate the block
         """
         data = self._prepare_data(self._block.block_header.nonce)
+        print("data:"+str(data))
         hash_hex = utils.sum256_hex(data)
         hash_val = int(hash_hex, 16)
-
+        print(hash_hex)
         return hash_val < self._target_bits

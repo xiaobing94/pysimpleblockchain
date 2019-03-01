@@ -8,9 +8,10 @@ from errors import NotEnoughAmountError
 from utils import address_to_pubkey_hash
 from wallets import Wallets
 from utxo import UTXOSet
+from conf import db_url
 
 class BlockChain(object):
-    def __init__(self, db_url='http://127.0.0.1:5984'):
+    def __init__(self, db_url=db_url):
         self.db = DB(db_url)
 
     def new_genesis_block(self, transaction):
@@ -53,6 +54,17 @@ class BlockChain(object):
             block = Block.deserialize(doc)
         return block
 
+    def roll_back(self):
+        last_block = self.get_last_block()
+        last_height = last_block.block_header.height
+        block_doc = self.db.get(last_block.block_header.hash)
+        try:
+            self.db.delete(block_doc)
+        except ResourceNotFound as e:
+            print(e)
+        block = self.get_block_by_height(last_height-1)
+        self.set_last_hash(block.block_header.hash)
+
     def get_block_by_hash(self, hash):
         """
         Get a block by hash
@@ -70,26 +82,55 @@ class BlockChain(object):
         prev_hash = last_block.get_header_hash()
         height = last_block.block_header.height + 1
         block_header = BlockHeader('', height, prev_hash)
-        
-        # reward to wallets[0]
+
+         # reward to wallets[0]
         wallets = Wallets()
         keys = list(wallets.wallets.keys())
         w = wallets[keys[0]]
         coin_base_tx = self.coin_base_tx(w.address)
         transactions.insert(0, coin_base_tx)
-        block = Block(block_header, transactions)
+        
+        utxo_set = UTXOSet()
+        txs = utxo_set.clear_transactions(transactions)
+
+        block = Block(block_header, txs)
         block.mine(self)
         block.set_header_hash()
         self.db.create(block.block_header.hash, block.serialize())
         last_hash = block.block_header.hash
         self.set_last_hash(last_hash)
 
+        utxo_set.update(block)
+    
+    def add_block_from_peers(self, block):
+        last_block = self.get_last_block()
         utxo = UTXOSet()
-        utxo.update(block)
+        if last_block:
+            prev_hash = last_block.get_header_hash()
+            last_height = last_block.block_header.height
+            if block.block_header.height < last_height:
+                raise ValueError('block height is error')
+            if not block.validate(self):
+                raise ValueError('block is not valid')
+            if block.block_header.height == last_height and block != last_block:
+                utxo.roll_back(last_block)
+                self.roll_back()
+            if block.block_header.height == last_height+1 and block.block_header.prev_block_hash == last_block.block_header.hash:
+                self.db.create(block.block_header.hash, block.serialize())
+                last_hash = block.block_header.hash
+                self.set_last_hash(last_hash)
+                utxo.update(block)
+        else:
+            self.db.create(block.block_header.hash, block.serialize())
+            last_hash = block.block_header.hash
+            self.set_last_hash(last_hash)
+            utxo.update(block)
     
     def __getitem__(self, index):
         last_block = self.get_last_block()
-        height = last_block.block_header.height
+        height = -1
+        if last_block:
+            height = last_block.block_header.height
         if index <= height:
             return self.get_block_by_height(index)
         else:

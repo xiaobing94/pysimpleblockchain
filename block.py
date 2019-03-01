@@ -34,6 +34,13 @@ class Block(object):
         except NonceNotFoundError as e:
             print(e)
         self._block_header.nonce = nonce
+
+    def validate(self, bc):
+        pow = ProofOfWork(self)
+        for tx in self._transactions:
+            if not bc.verify_transaction(tx):
+                raise TransactionVerifyError('transaction verify error')
+        return pow.validate()
     
     @classmethod
     def new_genesis_block(cls, coin_base_tx):
@@ -43,6 +50,9 @@ class Block(object):
     @property
     def block_header(self):
         return self._block_header
+
+    def set_transactions(self, txs):
+        self._transactions = txs
     
     @property
     def transactions(self):
@@ -73,6 +83,11 @@ class Block(object):
         for transaction in transactions:
             txs.append(Transaction.deserialize(transaction))
         return cls(block_header, txs)
+
+    def __eq__(self, other):
+        if isinstance(other, Block):
+            return self.block_header.hash == other.block_header.hash
+        return False
 
     def __repr__(self):
         return 'Block(_block_header=%s)' % self._block_header
