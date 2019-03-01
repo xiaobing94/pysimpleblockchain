@@ -5,3 +5,6 @@ class NonceNotFoundError(Exception):
 
 class NotEnoughAmountError(Exception):
     pass
+
+class TransactionVerifyError(Exception):
+    pass

@@ -1,5 +1,7 @@
 # coding:utf-8
 import hashlib
+import binascii
+import base58
 import threading
 
 def encode(str, code='utf-8'):
@@ -25,6 +27,14 @@ def sum256_byte(*args):
         else:
             m.update(arg)
     return m.digest()
+
+def hash_public_key(pubkey):
+    ripemd160 = hashlib.new('ripemd160')
+    ripemd160.update(hashlib.sha256(pubkey).digest())
+    return ripemd160.digest()
+
+def address_to_pubkey_hash(address):
+    return base58.b58decode_check(address)[1:]
 
 
 class Singleton(object):

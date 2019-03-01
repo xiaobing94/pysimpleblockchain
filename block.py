@@ -1,5 +1,5 @@
 # coding:utf-8
-from errors import NonceNotFoundError
+from errors import NonceNotFoundError, TransactionVerifyError
 from pow import ProofOfWork
 from block_header import BlockHeader
 from transactions import Transaction
@@ -17,8 +17,11 @@ class Block(object):
         self._block_header = block_header
         self._transactions = transactions
 
-    def mine(self):
+    def mine(self, bc):
         pow = ProofOfWork(self)
+        for tx in self._transactions:
+            if not bc.verify_transaction(tx):
+                raise TransactionVerifyError('transaction verify error')
         try:
             nonce, _ = pow.run()
         except NonceNotFoundError as e:

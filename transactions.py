@@ -1,38 +1,47 @@
 # coding:utf-8
-from utils import sum256_hex
+import binascii
+import ecdsa
+from utils import sum256_hex, hash_public_key, address_to_pubkey_hash
 
 subsidy = 1000
 
 class TXOutput(object):
-    def __init__(self, value, script_pub_key):
+    def __init__(self, value, pub_key_hash=''):
         self.value = value
-        self.script_pub_key = script_pub_key
+        self.pub_key_hash = pub_key_hash
 
-    def can_unlock_output_with(self, unlocking_data):
-        return self.script_pub_key == unlocking_data
+    def lock(self, address):
+        hex_pub_key_hash = binascii.hexlify(address_to_pubkey_hash(address))
+        self.pub_key_hash = hex_pub_key_hash
+    
+    def is_locked_with_key(self, pub_key_hash):
+        return self.pub_key_hash == pub_key_hash
 
     def serialize(self):
         return self.__dict__
 
     def __repr__(self):
-        return 'TXOutput(value={value}, script_pub_key={script_pub_key})'.format(
-            value=self.value, script_pub_key=self.script_pub_key)
+        return 'TXOutput(value={value}, pub_key_hash={pub_key_hash})'.format(
+            value=self.value, pub_key_hash=self.pub_key_hash)
 
     @classmethod
     def deserialize(cls, data):
         value = data.get('value', 0)
-        script_pub_key = data.get('script_pub_key', 0)
-        return cls(value, script_pub_key)
+        pub_key_hash = data.get('pub_key_hash', 0)
+        return cls(value, pub_key_hash)
 
 
 class TXInput(object):
-    def __init__(self, txid, vout, script_sig):
+    def __init__(self, txid, vout, pub_key):
         self.txid = txid
         self.vout = vout  # index of outpus
-        self.script_sig = script_sig
+        self.signature = ''
+        self.pub_key = pub_key
 
-    def can_be_unlocked_with(self, unlocking_data):
-        return self.script_sig == unlocking_data
+    def use_key(self, pub_key_hash):
+        bin_pub_key = binascii.unhexlify(self.pub_key)
+        hash = hash_public_key(bin_pub_key)
+        return pub_key_hash == hash
 
     def serialize(self):
         return self.__dict__
@@ -45,8 +54,12 @@ class TXInput(object):
     def deserialize(cls, data):
         txid = data.get('txid', '')
         vout = data.get('vout', 0)
-        script_sig = data.get('script_sig', '')
-        return cls(txid, vout, script_sig)
+        signature = data.get('signature', '')
+        pub_key = data.get('pub_key', '')
+        tx_input = cls(txid, vout, pub_key)
+        tx_input.signature = signature
+        return tx_input
+
 
 class Transaction(object):
     def __init__(self, vins, vouts):
@@ -101,3 +114,54 @@ class Transaction(object):
     def __repr__(self):
         return 'Transaction(txid={txid}, vins={vins}, vouts={vouts})'.format(
             txid=self.txid, vins=self.vins, vouts=self.vouts)
+
+    def _trimmed_copy(self):
+        inputs = []
+        outputs = []
+
+        for vin in self.vins:
+            inputs.append(TXInput(vin.txid, vin.vout, None))
+
+        for vout in self.vouts:
+            outputs.append(TXOutput(vout.value, vout.pub_key_hash))
+        tx = Transaction(inputs, outputs)
+        tx.txid = self.txid
+        return tx
+
+    def sign(self, priv_key, prev_txs):
+        if self.is_coinbase():
+            return
+        tx_copy = self._trimmed_copy()
+
+        for in_id, vin in enumerate(tx_copy.vins):
+            prev_tx = prev_txs.get(vin.txid, None)
+            if not prev_tx:
+                raise ValueError('Previous transaction is error')
+            tx_copy.vins[in_id].signature = None
+            tx_copy.vins[in_id].pub_key = prev_tx.vouts[vin.vout].pub_key_hash
+            tx_copy.set_id()
+            tx_copy.vins[in_id].pub_key = None
+
+            sk = ecdsa.SigningKey.from_string(
+                binascii.a2b_hex(priv_key), curve=ecdsa.SECP256k1)
+            sign = sk.sign(tx_copy.txid.encode())
+            self.vins[in_id].signature = binascii.hexlify(sign).decode()
+    
+    def verify(self, prev_txs):
+        tx_copy = self._trimmed_copy()
+
+        for in_id, vin in enumerate(self.vins):
+            prev_tx = prev_txs.get(vin.txid, None)
+            if not prev_tx:
+                raise ValueError('Previous transaction is error')
+            tx_copy.vins[in_id].signature = None
+            tx_copy.vins[in_id].pub_key = prev_tx.vouts[vin.vout].pub_key_hash
+            tx_copy.set_id()
+            tx_copy.vins[in_id].pub_key = None
+
+            sign = binascii.unhexlify(self.vins[in_id].signature)
+            vk = ecdsa.VerifyingKey.from_string(
+                binascii.a2b_hex(vin.pub_key), curve=ecdsa.SECP256k1)
+            if not vk.verify(sign, tx_copy.txid.encode()):
+                return False
+        return True
