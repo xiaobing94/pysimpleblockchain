@@ -60,4 +60,4 @@ $python3 cli.py send --from 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r --to 19zR4zT9eSFs
 python3 cli.py balance 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r
 1LYHea8NjTxaYboXJbR7LemvUZjyQc839r balance is 1900
 ```
-注意：这里因为重复转了两笔账，使用了同一个UTXO，所以第二笔会失败，由于`1LYHea8NjTxaYboXJbR7LemvUZjyQc839r`为被奖励地址，所以获得了1000得挖矿奖励所以余额为:1000-100+900=1900。
+注意：这里因为重复转了两笔账，使用了同一个UTXO，所以第二笔会失败，由于`1LYHea8NjTxaYboXJbR7LemvUZjyQc839r`为被奖励地址，所以获得了1000得挖矿奖励所以余额为:1000-100+1000=1900。
