@@ -15,6 +15,18 @@
 2. 安装couchdb(每个节点都要安装)
 	1. 直接安装，参考https://www.yiibai.com/couchdb/quick-start.html
 	2. docker版couchdb安装，使用docker-compose安装couchdb
+```yaml
+# couchdb.yaml
+version: '2'
+
+services:
+  couchdb:
+    image: hyperledger/fabric-couchdb
+    ports:
+    - 5984:5984
+```
+执行`docker-compose -f couchdb.yaml up -d`即可安装。
+使用http://ip:5984/_utils即可访问couchdb的后台管理系统。
 
 ## 使用方法
 分别打开两台主机A和B:
