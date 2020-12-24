@@ -21,7 +21,7 @@ version: '2'
 
 services:
   couchdb:
-    image: hyperledger/fabric-couchdb
+    image: hyperledger/fabric-couchdb:amd64-0.4.15
     ports:
     - 5984:5984
 ```
